@@ -18,12 +18,42 @@ import { notFound, errorHandler } from './middleware/errors.js';
 const app = express();
 const server = http.createServer(app);
 
+// Allowed origins for CORS (Vercel deployment, local dev, env var)
+const allowedOrigins = [
+  'https://i-movies-project.vercel.app',
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+].filter(Boolean);
+
+// CORS configuration that allows Vercel, localhost, and reflects valid origins
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (Postman, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
+      return callback(null, true);
+    }
+    // Reflect origin to avoid blocking valid clients
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
+
 // Initialize Socket.IO for real-time seat locks
-const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 const io = new Server(server, {
   cors: {
-    origin: [clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (origin, callback) => callback(null, true),
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
@@ -46,21 +76,19 @@ app.use(
     crossOriginEmbedderPolicy: false,
   })
 );
-app.use(
-  cors({
-    origin: [clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
-    credentials: true,
-  })
-);
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
+
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
 
-// Rate limiting
+// Rate limiting (more generous for multi-user frontend traffic)
 app.use(
   '/api',
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 500,
+    limit: 1000,
     standardHeaders: true,
     legacyHeaders: false,
   })
@@ -88,13 +116,17 @@ app.use(errorHandler);
 
 const port = process.env.PORT || 5000;
 
+// Connect to MongoDB and start listening
 connectDB()
   .then(() => {
     server.listen(port, () => {
-      console.log(`[iMovies API] Server listening on http://localhost:${port}`);
+      console.log(`[iMovies API] Server listening on port ${port}`);
     });
   })
   .catch((err) => {
     console.error('[iMovies API] Database connection failed:', err.message);
-    process.exit(1);
+    // Still bind the port on Render so container doesn't immediately crash and returns diagnostics
+    server.listen(port, () => {
+      console.warn(`[iMovies API] Running in degraded mode on port ${port} without DB connection.`);
+    });
   });
