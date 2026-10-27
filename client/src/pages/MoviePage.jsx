@@ -1,0 +1,332 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import api from '../api';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
+import { io } from 'socket.io-client';
+
+export default function MoviePage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [movie, setMovie] = useState(null);
+  const [shows, setShows] = useState([]);
+  const [selectedShow, setSelectedShow] = useState(null);
+  const [seats, setSeats] = useState([]);
+  const [chosenSeats, setChosenSeats] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [loadingMovie, setLoadingMovie] = useState(true);
+
+  // 1. Fetch movie details and shows
+  async function loadShows() {
+    try {
+      const res = await api.get('/shows', { params: { movieId: id } });
+      setShows(res.data);
+      if (res.data.length > 0 && !selectedShow) {
+        setSelectedShow(res.data[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load shows:', err);
+    }
+  }
+
+  async function loadSeats(showId) {
+    try {
+      const res = await api.get(`/shows/${showId}/seats`);
+      setSeats(res.data.seats);
+      setChosenSeats([]);
+    } catch (err) {
+      toast.error('Could not load seat map');
+    }
+  }
+
+  useEffect(() => {
+    setLoadingMovie(true);
+    api
+      .get(`/movies/${id}`)
+      .then((res) => {
+        setMovie(res.data);
+      })
+      .catch(() => toast.error('Movie not found'))
+      .finally(() => setLoadingMovie(false));
+
+    loadShows();
+  }, [id]);
+
+  // 2. Real-time updates via Socket.IO
+  useEffect(() => {
+    if (!selectedShow) return;
+
+    loadSeats(selectedShow._id);
+
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const socket = io(socketUrl);
+
+    socket.emit('show:join', selectedShow._id);
+
+    socket.on('seats:changed', (data) => {
+      if (data.showId === selectedShow._id) {
+        loadSeats(selectedShow._id);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [selectedShow?._id]);
+
+  // Toggle seat selection
+  function handleSeatClick(code) {
+    if (chosenSeats.includes(code)) {
+      setChosenSeats((prev) => prev.filter((s) => s !== code));
+    } else {
+      if (chosenSeats.length >= 8) {
+        toast.warning('You can select a maximum of 8 seats per booking.');
+        return;
+      }
+      setChosenSeats((prev) => [...prev, code]);
+    }
+  }
+
+  // Confirm booking
+  async function handleBook() {
+    if (!user) {
+      toast.info('Please log in to complete your booking.');
+      navigate('/login');
+      return;
+    }
+
+    if (!chosenSeats.length) {
+      toast.info('Please select at least one seat.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      // Step 1: Hold selected seats
+      await api.post(`/shows/${selectedShow._id}/hold`, { seats: chosenSeats });
+
+      // Step 2: Finalize booking
+      const res = await api.post(`/shows/${selectedShow._id}/book`, { seats: chosenSeats });
+
+      toast.success(`Booking Confirmed! Code: ${res.data.booking.bookingCode}`);
+      navigate('/bookings');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Booking failed. Please try again.';
+      toast.error(msg);
+      if (selectedShow) {
+        loadSeats(selectedShow._id);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loadingMovie) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-danger" role="status"></div>
+        <p className="text-secondary mt-2">Loading movie details...</p>
+      </div>
+    );
+  }
+
+  if (!movie) {
+    return (
+      <div className="empty text-center py-5">
+        <h3>Movie not found</h3>
+        <p className="text-secondary">This movie might have been removed or archived.</p>
+        <Link to="/" className="btn btn-danger mt-2">
+          Back to Movies
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="row g-4">
+      {/* Movie Poster & Metadata */}
+      <div className="col-lg-4">
+        {movie.posterUrl ? (
+          <img
+            className="detail-poster"
+            src={movie.posterUrl}
+            alt={movie.title}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src =
+                'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=80';
+            }}
+          />
+        ) : (
+          <div className="detail-poster poster-placeholder">🎬</div>
+        )}
+
+        {movie.trailerUrl && (
+          <a
+            href={movie.trailerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-outline-light w-100 mt-3 d-flex align-items-center justify-content-center gap-2"
+          >
+            <span>▶</span> Watch Official Trailer
+          </a>
+        )}
+      </div>
+
+      {/* Movie Details and Show Selection */}
+      <div className="col-lg-8">
+        <span className="eyebrow">MOVIE OVERVIEW</span>
+        <h1 className="display-6 fw-bold mt-2">{movie.title}</h1>
+
+        <div className="d-flex flex-wrap gap-2 align-items-center text-secondary mb-3">
+          <span className="badge bg-secondary">{movie.certificate || 'U/A'}</span>
+          <span>·</span>
+          <span>{movie.durationMinutes} mins</span>
+          <span>·</span>
+          <span>{movie.genres?.join(', ') || 'Feature Film'}</span>
+          <span>·</span>
+          <span>{movie.languages?.join(', ') || 'English'}</span>
+          <span>·</span>
+          <span className="text-warning fw-bold">⭐ {movie.rating || '8.5'}/10</span>
+        </div>
+
+        <p className="lead fs-6 text-light-emphasis">
+          {movie.description || 'No detailed synopsis available for this feature.'}
+        </p>
+
+        {/* Showtime Selector */}
+        <div className="mt-4 pt-3 border-top border-secondary-subtle">
+          <h2 className="h5 fw-bold mb-3">1. Select Showtime & Cinema</h2>
+
+          {shows.length === 0 ? (
+            <div className="empty">
+              <p className="mb-0 text-secondary">
+                No upcoming shows scheduled for this movie currently. Please check back later or check another movie!
+              </p>
+            </div>
+          ) : (
+            <div className="d-flex flex-wrap gap-2">
+              {shows.map((s) => {
+                const isSelected = selectedShow?._id === s._id;
+                const formattedDate = new Date(s.startsAt).toLocaleDateString([], {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                });
+                const formattedTime = new Date(s.startsAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+
+                return (
+                  <button
+                    key={s._id}
+                    className={`btn text-start p-2 px-3 ${
+                      isSelected ? 'btn-danger' : 'btn-outline-secondary'
+                    }`}
+                    onClick={() => setSelectedShow(s)}
+                  >
+                    <div className="fw-bold">{formattedTime}</div>
+                    <small className="d-block text-truncate" style={{ maxWidth: '180px' }}>
+                      {s.theatre?.name || 'Cinema'}
+                    </small>
+                    <small className="opacity-75">
+                      {formattedDate} · ₹{s.price}
+                    </small>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Seat Booking Matrix */}
+        {selectedShow && (
+          <section className="seat-panel mt-4 p-3 p-md-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 className="h5 fw-bold mb-0">2. Select Your Seats</h3>
+                <small className="text-secondary">
+                  {selectedShow.theatre?.name} · {selectedShow.screen || 'Screen 1'}
+                </small>
+              </div>
+              <span className="badge bg-danger fs-6">₹{selectedShow.price} / seat</span>
+            </div>
+
+            {/* Cinema Screen Curve */}
+            <div className="screen">SCREEN THIS WAY</div>
+
+            {/* Seat Status Legend */}
+            <div className="seat-legend">
+              <span className="d-flex align-items-center gap-1">
+                <span style={{ color: '#22c55e' }}>●</span> Available
+              </span>
+              <span className="d-flex align-items-center gap-1">
+                <span style={{ color: '#facc15' }}>●</span> Selected
+              </span>
+              <span className="d-flex align-items-center gap-1">
+                <span style={{ color: '#dc2626' }}>●</span> Booked / Held
+              </span>
+            </div>
+
+            {/* Grid */}
+            <div className="seat-grid">
+              {seats.map((s) => {
+                const isUnavailable = s.status === 'booked' || s.status === 'held';
+                const isChosen = chosenSeats.includes(s.code);
+
+                return (
+                  <button
+                    key={s.code}
+                    title={`${s.code}: ${isUnavailable ? 'Unavailable' : 'Available'}`}
+                    disabled={isUnavailable}
+                    onClick={() => handleSeatClick(s.code)}
+                    className={`seat ${
+                      isUnavailable ? 'unavailable' : isChosen ? 'chosen' : ''
+                    }`}
+                  >
+                    {s.code}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Booking Summary Bar */}
+            <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top border-secondary flex-wrap gap-2">
+              <div>
+                <div className="fw-bold fs-6">
+                  Selected Seats: {chosenSeats.length ? chosenSeats.join(', ') : 'None'}
+                </div>
+                <div className="text-secondary small">
+                  {chosenSeats.length} seats × ₹{selectedShow.price} ={' '}
+                  <strong className="text-light">₹{chosenSeats.length * selectedShow.price}</strong>
+                </div>
+              </div>
+
+              <button
+                className="btn btn-danger px-4 py-2"
+                disabled={!chosenSeats.length || busy}
+                onClick={handleBook}
+              >
+                {busy ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                    Processing...
+                  </>
+                ) : (
+                  `Confirm Booking · ₹${chosenSeats.length * selectedShow.price}`
+                )}
+              </button>
+            </div>
+
+            <small className="text-secondary d-block mt-3 text-center">
+              ⚡ Real-time seat updates enabled via Socket.IO. Demo payment is simulated.
+            </small>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
