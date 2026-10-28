@@ -1,5 +1,25 @@
 import mongoose from 'mongoose';
 
+const castMemberSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    role: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    photoUrl: {
+      type: String,
+      default: '',
+    },
+  },
+  { _id: false }
+);
+
 const movieSchema = new mongoose.Schema(
   {
     title: {
@@ -19,6 +39,19 @@ const movieSchema = new mongoose.Schema(
     trailerUrl: {
       type: String,
       default: '',
+    },
+    director: {
+      type: String,
+      default: 'Famous Director',
+      trim: true,
+    },
+    producers: {
+      type: [String],
+      default: [],
+    },
+    cast: {
+      type: [castMemberSchema],
+      default: [],
     },
     genres: {
       type: [String],

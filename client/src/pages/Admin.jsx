@@ -17,6 +17,9 @@ export default function Admin() {
   const [description, setDescription] = useState('');
   const [posterUrl, setPosterUrl] = useState('');
   const [trailerUrl, setTrailerUrl] = useState('');
+  const [director, setDirector] = useState('Christopher Nolan');
+  const [producers, setProducers] = useState('Emma Thomas');
+  const [castInput, setCastInput] = useState('Christian Bale as Bruce Wayne, Heath Ledger as Joker');
   const [genres, setGenres] = useState('Action, Sci-Fi');
   const [languages, setLanguages] = useState('Hindi, English');
   const [durationMinutes, setDuration] = useState(135);
@@ -26,7 +29,9 @@ export default function Admin() {
   // Form states - Theatre
   const [theatreName, setTheatreName] = useState('');
   const [location, setLocation] = useState('');
+  const [city, setCity] = useState('Mumbai');
   const [screens, setScreens] = useState('Screen 1, Screen 2, IMAX');
+  const [facilities, setFacilities] = useState('Dolby Atmos, Recliner Seats, Parking');
 
   // Form states - Show
   const [selectedMovie, setSelectedMovie] = useState('');
@@ -44,7 +49,7 @@ export default function Admin() {
     try {
       setLoading(true);
       const [mRes, tRes] = await Promise.all([
-        api.get('/movies?limit=50'),
+        api.get('/movies?limit=100'),
         api.get('/theatres'),
       ]);
       setMovies(mRes.data.items);
@@ -99,12 +104,27 @@ export default function Admin() {
   async function handleAddMovie(e) {
     e.preventDefault();
     setBusy(true);
+
+    const parsedCast = castInput
+      .split(',')
+      .map((item) => {
+        const parts = item.split(' as ');
+        return {
+          name: parts[0]?.trim() || '',
+          role: parts[1]?.trim() || '',
+        };
+      })
+      .filter((c) => c.name);
+
     try {
       await api.post('/movies', {
         title,
         description,
         posterUrl,
         trailerUrl,
+        director,
+        producers: producers.split(',').map((s) => s.trim()).filter(Boolean),
+        cast: parsedCast,
         genres: genres.split(',').map((s) => s.trim()).filter(Boolean),
         languages: languages.split(',').map((s) => s.trim()).filter(Boolean),
         durationMinutes: Number(durationMinutes),
@@ -132,10 +152,12 @@ export default function Admin() {
       await api.post('/theatres', {
         name: theatreName,
         location,
+        city,
         screens: screens.split(',').map((s) => s.trim()).filter(Boolean),
+        facilities: facilities.split(',').map((s) => s.trim()).filter(Boolean),
       });
 
-      toast.success(`Theatre "${theatreName}" added!`);
+      toast.success(`Theatre "${theatreName}" added in ${city}!`);
       setTheatreName('');
       setLocation('');
       loadData();
@@ -246,18 +268,51 @@ export default function Admin() {
 
             <div className="row g-3 mb-3">
               <div className="col-md-6">
-                <label className="form-label small text-secondary">Poster Image URL</label>
+                <label className="form-label small text-secondary">Director *</label>
+                <input
+                  required
+                  className="form-control"
+                  placeholder="e.g. Christopher Nolan"
+                  value={director}
+                  onChange={(e) => setDirector(e.target.value)}
+                />
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label small text-secondary">Producers (comma-separated)</label>
+                <input
+                  className="form-control"
+                  placeholder="e.g. Emma Thomas, Kevin Feige"
+                  value={producers}
+                  onChange={(e) => setProducers(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label small text-secondary">Starring Cast (Format: Actor as Character, ...)</label>
+              <input
+                className="form-control"
+                placeholder="e.g. Cillian Murphy as Oppenheimer, Emily Blunt as Kitty"
+                value={castInput}
+                onChange={(e) => setCastInput(e.target.value)}
+              />
+            </div>
+
+            <div className="row g-3 mb-3">
+              <div className="col-md-6">
+                <label className="form-label small text-secondary">Poster Image URL (TMDB / High-Res)</label>
                 <input
                   type="url"
                   className="form-control"
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="https://image.tmdb.org/t/p/w780/..."
                   value={posterUrl}
                   onChange={(e) => setPosterUrl(e.target.value)}
                 />
               </div>
 
               <div className="col-md-6">
-                <label className="form-label small text-secondary">Trailer URL (YouTube / Web)</label>
+                <label className="form-label small text-secondary">Trailer URL (YouTube)</label>
                 <input
                   type="url"
                   className="form-control"
@@ -332,35 +387,67 @@ export default function Admin() {
           <form onSubmit={handleAddTheatre}>
             <h2 className="h5 fw-bold mb-3">Add Cinema Theatre / Branch</h2>
 
-            <div className="mb-3">
-              <label className="form-label small text-secondary">Cinema Brand / Name *</label>
-              <input
-                required
-                className="form-control"
-                placeholder="e.g. Cinepolis IMAX: DLF Mall"
-                value={theatreName}
-                onChange={(e) => setTheatreName(e.target.value)}
-              />
+            <div className="row g-3 mb-3">
+              <div className="col-md-7">
+                <label className="form-label small text-secondary">Cinema Brand / Name *</label>
+                <input
+                  required
+                  className="form-control"
+                  placeholder="e.g. Cinepolis IMAX: Forum Mall"
+                  value={theatreName}
+                  onChange={(e) => setTheatreName(e.target.value)}
+                />
+              </div>
+
+              <div className="col-md-5">
+                <label className="form-label small text-secondary">City / Region *</label>
+                <select
+                  required
+                  className="form-select"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                >
+                  <option value="Mumbai">Mumbai</option>
+                  <option value="Delhi NCR">Delhi NCR</option>
+                  <option value="Bengaluru">Bengaluru</option>
+                  <option value="Hyderabad">Hyderabad</option>
+                  <option value="Pune">Pune</option>
+                  <option value="Kolkata">Kolkata</option>
+                  <option value="Chennai">Chennai</option>
+                  <option value="Ahmedabad">Ahmedabad</option>
+                </select>
+              </div>
             </div>
 
             <div className="mb-3">
-              <label className="form-label small text-secondary">City & Location *</label>
+              <label className="form-label small text-secondary">Address / Location Details *</label>
               <input
                 required
                 className="form-control"
-                placeholder="e.g. Connaught Place, New Delhi"
+                placeholder="e.g. Koramangala, Hosur Main Road, Bengaluru"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
               />
             </div>
 
-            <div className="mb-4">
-              <label className="form-label small text-secondary">Screens (comma-separated)</label>
-              <input
-                className="form-control"
-                value={screens}
-                onChange={(e) => setScreens(e.target.value)}
-              />
+            <div className="row g-3 mb-4">
+              <div className="col-md-6">
+                <label className="form-label small text-secondary">Screens (comma-separated)</label>
+                <input
+                  className="form-control"
+                  value={screens}
+                  onChange={(e) => setScreens(e.target.value)}
+                />
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label small text-secondary">Facilities (comma-separated)</label>
+                <input
+                  className="form-control"
+                  value={facilities}
+                  onChange={(e) => setFacilities(e.target.value)}
+                />
+              </div>
             </div>
 
             <button className="btn btn-danger px-4" disabled={busy}>
@@ -401,7 +488,7 @@ export default function Admin() {
                 >
                   {theatres.map((t) => (
                     <option key={t._id} value={t._id}>
-                      {t.name} — {t.location}
+                      {t.name} [{t.city || 'India'}] — {t.location}
                     </option>
                   ))}
                 </select>
@@ -505,6 +592,7 @@ export default function Admin() {
                 <thead>
                   <tr>
                     <th>Title</th>
+                    <th>Director</th>
                     <th>Genres</th>
                     <th>Duration</th>
                     <th>Rating</th>
@@ -515,6 +603,7 @@ export default function Admin() {
                   {movies.map((m) => (
                     <tr key={m._id}>
                       <td className="fw-bold">{m.title}</td>
+                      <td>{m.director || 'N/A'}</td>
                       <td>{m.genres?.join(', ')}</td>
                       <td>{m.durationMinutes} mins</td>
                       <td>⭐ {m.rating}</td>
@@ -535,16 +624,20 @@ export default function Admin() {
                 <thead>
                   <tr>
                     <th>Theatre Name</th>
+                    <th>City</th>
                     <th>Location</th>
-                    <th>Screens</th>
+                    <th>Facilities</th>
                   </tr>
                 </thead>
                 <tbody>
                   {theatres.map((t) => (
                     <tr key={t._id}>
                       <td className="fw-bold">{t.name}</td>
+                      <td>
+                        <span className="badge bg-danger">{t.city || 'India'}</span>
+                      </td>
                       <td>{t.location}</td>
-                      <td>{t.screens?.join(', ') || 'Standard'}</td>
+                      <td>{t.facilities?.join(', ') || 'Standard'}</td>
                     </tr>
                   ))}
                 </tbody>

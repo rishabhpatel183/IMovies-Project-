@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ export default function MoviePage() {
   const [movie, setMovie] = useState(null);
   const [shows, setShows] = useState([]);
   const [selectedShow, setSelectedShow] = useState(null);
+  const [selectedCity, setSelectedCity] = useState('All');
   const [seats, setSeats] = useState([]);
   const [chosenSeats, setChosenSeats] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -75,6 +76,36 @@ export default function MoviePage() {
       socket.disconnect();
     };
   }, [selectedShow?._id]);
+
+  // Group shows by Theatre and extract unique cities
+  const { availableCities, groupedShowsByTheatre } = useMemo(() => {
+    const citiesSet = new Set(['All']);
+    const theatreMap = new Map();
+
+    shows.forEach((s) => {
+      const t = s.theatre;
+      const city = t?.city || 'Mumbai';
+      citiesSet.add(city);
+
+      if (selectedCity !== 'All' && city !== selectedCity) {
+        return;
+      }
+
+      const tId = t?._id || 'unknown';
+      if (!theatreMap.has(tId)) {
+        theatreMap.set(tId, {
+          theatre: t,
+          shows: [],
+        });
+      }
+      theatreMap.get(tId).shows.push(s);
+    });
+
+    return {
+      availableCities: Array.from(citiesSet),
+      groupedShowsByTheatre: Array.from(theatreMap.values()),
+    };
+  }, [shows, selectedCity]);
 
   // Toggle seat selection
   function handleSeatClick(code) {
@@ -173,9 +204,23 @@ export default function MoviePage() {
             <span>▶</span> Watch Official Trailer
           </a>
         )}
+
+        {/* Director & Producer Side Panel */}
+        <div className="crew-box mt-3">
+          <div className="mb-2">
+            <span className="text-secondary small d-block">🎬 Directed By</span>
+            <strong className="text-light fs-6">{movie.director || 'N/A'}</strong>
+          </div>
+          {movie.producers?.length > 0 && (
+            <div>
+              <span className="text-secondary small d-block">💼 Produced By</span>
+              <span className="text-light-emphasis small">{movie.producers.join(', ')}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Movie Details and Show Selection */}
+      {/* Movie Details, Cast & Show Selection */}
       <div className="col-lg-8">
         <span className="eyebrow">MOVIE OVERVIEW</span>
         <h1 className="display-6 fw-bold mt-2">{movie.title}</h1>
@@ -192,62 +237,145 @@ export default function MoviePage() {
           <span className="text-warning fw-bold">⭐ {movie.rating || '8.5'}/10</span>
         </div>
 
-        <p className="lead fs-6 text-light-emphasis">
+        <p className="lead fs-6 text-light-emphasis mb-4">
           {movie.description || 'No detailed synopsis available for this feature.'}
         </p>
 
-        {/* Showtime Selector */}
-        <div className="mt-4 pt-3 border-top border-secondary-subtle">
-          <h2 className="h5 fw-bold mb-3">1. Select Showtime & Cinema</h2>
-
-          {shows.length === 0 ? (
-            <div className="empty">
-              <p className="mb-0 text-secondary">
-                No upcoming shows scheduled for this movie currently. Please check back later or check another movie!
-              </p>
-            </div>
-          ) : (
-            <div className="d-flex flex-wrap gap-2">
-              {shows.map((s) => {
-                const isSelected = selectedShow?._id === s._id;
-                const formattedDate = new Date(s.startsAt).toLocaleDateString([], {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                });
-                const formattedTime = new Date(s.startsAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
+        {/* CAST & CREW SECTION */}
+        {movie.cast && movie.cast.length > 0 && (
+          <section className="mb-4 pt-3 border-top border-secondary-subtle">
+            <h2 className="h6 fw-bold text-uppercase text-secondary tracking-wider mb-3">
+              Starring Cast & Characters
+            </h2>
+            <div className="cast-grid">
+              {movie.cast.map((actor, idx) => {
+                const initials = actor.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('');
 
                 return (
-                  <button
-                    key={s._id}
-                    className={`btn text-start p-2 px-3 ${
-                      isSelected ? 'btn-danger' : 'btn-outline-secondary'
-                    }`}
-                    onClick={() => setSelectedShow(s)}
-                  >
-                    <div className="fw-bold">{formattedTime}</div>
-                    <small className="d-block text-truncate" style={{ maxWidth: '180px' }}>
-                      {s.theatre?.name || 'Cinema'}
-                    </small>
-                    <small className="opacity-75">
-                      {formattedDate} · ₹{s.price}
-                    </small>
-                  </button>
+                  <div className="cast-card" key={idx}>
+                    <div className="cast-avatar">{initials}</div>
+                    <div className="overflow-hidden">
+                      <div className="fw-bold text-light small text-truncate" title={actor.name}>
+                        {actor.name}
+                      </div>
+                      {actor.role && (
+                        <div className="text-secondary small text-truncate" title={actor.role}>
+                          as {actor.role}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
-          )}
-        </div>
+          </section>
+        )}
 
-        {/* Seat Booking Matrix */}
+        {/* MULTIPLE THEATRES & SHOWTIME SELECTOR */}
+        <section className="mt-4 pt-3 border-top border-secondary-subtle">
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+              <h2 className="h5 fw-bold mb-0">Select Cinema & Showtime</h2>
+              <small className="text-secondary">Available across multiple cities and multiplex screens</small>
+            </div>
+
+            {/* City Selector Pills */}
+            <div className="d-flex gap-1 flex-wrap">
+              {availableCities.map((c) => (
+                <button
+                  key={c}
+                  className={`btn btn-sm ${
+                    selectedCity === c ? 'btn-danger' : 'btn-outline-secondary'
+                  }`}
+                  onClick={() => setSelectedCity(c)}
+                >
+                  📍 {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {groupedShowsByTheatre.length === 0 ? (
+            <div className="empty">
+              <p className="mb-0 text-secondary">
+                No shows currently scheduled in <strong>{selectedCity}</strong> for this film. Try selecting "All" or another city!
+              </p>
+            </div>
+          ) : (
+            <div className="d-grid gap-3">
+              {groupedShowsByTheatre.map(({ theatre, shows: tShows }) => (
+                <div className="theatre-card" key={theatre?._id || Math.random()}>
+                  <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                      <h3 className="h6 fw-bold text-light mb-1">
+                        🏛️ {theatre?.name || 'Multiplex Cinema'}
+                      </h3>
+                      <p className="text-secondary small mb-1">
+                        📍 {theatre?.location || 'City'} · <span className="badge bg-dark border border-secondary">{theatre?.city || 'India'}</span>
+                      </p>
+                    </div>
+
+                    {/* Facilities Tags */}
+                    {theatre?.facilities?.length > 0 && (
+                      <div className="d-flex gap-1 flex-wrap">
+                        {theatre.facilities.slice(0, 3).map((f, i) => (
+                          <span className="facility-pill" key={i}>
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Showtimes Buttons */}
+                  <div className="d-flex flex-wrap gap-2 mt-2">
+                    {tShows.map((s) => {
+                      const isSelected = selectedShow?._id === s._id;
+                      const formattedDate = new Date(s.startsAt).toLocaleDateString([], {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      });
+                      const formattedTime = new Date(s.startsAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
+
+                      return (
+                        <button
+                          key={s._id}
+                          className={`btn text-start p-2 px-3 ${
+                            isSelected ? 'btn-danger' : 'btn-outline-secondary'
+                          }`}
+                          onClick={() => setSelectedShow(s)}
+                        >
+                          <div className="fw-bold">{formattedTime}</div>
+                          <small className="d-block text-truncate" style={{ maxWidth: '140px' }}>
+                            {s.screen || 'Screen 1'}
+                          </small>
+                          <small className="opacity-75">
+                            {formattedDate} · ₹{s.price}
+                          </small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* SEAT BOOKING MATRIX */}
         {selectedShow && (
           <section className="seat-panel mt-4 p-3 p-md-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <div>
-                <h3 className="h5 fw-bold mb-0">2. Select Your Seats</h3>
+                <h3 className="h5 fw-bold mb-0">Select Your Seats</h3>
                 <small className="text-secondary">
                   {selectedShow.theatre?.name} · {selectedShow.screen || 'Screen 1'}
                 </small>

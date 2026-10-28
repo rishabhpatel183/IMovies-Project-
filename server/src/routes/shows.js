@@ -57,10 +57,10 @@ router.get(
     }
 
     const shows = await Show.find(query)
-      .populate('movie', 'title posterUrl durationMinutes languages genres certificate')
-      .populate('theatre', 'name location screens')
+      .populate('movie', 'title posterUrl durationMinutes languages genres certificate director producers cast')
+      .populate('theatre', 'name location city address screens facilities')
       .sort({ startsAt: 1 })
-      .limit(100);
+      .limit(150);
 
     res.json(shows);
   })
@@ -123,8 +123,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const show = await Show.findById(req.params.id)
       .select('seats seatLayout price startsAt screen theatre movie')
-      .populate('theatre', 'name location')
-      .populate('movie', 'title durationMinutes certificate');
+      .populate('theatre', 'name location city address screens facilities')
+      .populate('movie', 'title durationMinutes certificate director producers cast');
 
     if (!show) {
       return res.status(404).json({ message: 'Show not found' });

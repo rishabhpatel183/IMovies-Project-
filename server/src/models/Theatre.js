@@ -12,9 +12,23 @@ const theatreSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    city: {
+      type: String,
+      default: 'Mumbai',
+      trim: true,
+      index: true,
+    },
+    address: {
+      type: String,
+      default: '',
+    },
     screens: {
       type: [String],
       default: ['Screen 1', 'Screen 2', 'IMAX Screen'],
+    },
+    facilities: {
+      type: [String],
+      default: ['Parking', 'Dolby Atmos', 'Recliner Seats', 'Food Court'],
     },
     active: {
       type: Boolean,

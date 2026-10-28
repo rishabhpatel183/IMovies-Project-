@@ -203,12 +203,79 @@ body {
 /* Movie Details */
 .detail-poster {
   width: 100%;
-  max-height: 480px;
-  min-height: 300px;
+  max-height: 520px;
+  min-height: 320px;
   object-fit: cover;
   border-radius: 18px;
   border: 1px solid var(--border-color);
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Cast and Crew Styling */
+.cast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.cast-card {
+  background-color: #0d1424;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.cast-card:hover {
+  transform: translateY(-2px);
+  border-color: #64748b;
+}
+
+.cast-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e11d48, #4f46e5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.crew-box {
+  background-color: #0d1424;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+
+/* Multi-Theatre Location Styling */
+.theatre-card {
+  background-color: #0d1424;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.theatre-card:hover {
+  border-color: #4b5563;
+}
+
+.facility-pill {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  background: #1e293b;
+  border-radius: 6px;
+  color: #94a3b8;
+  display: inline-block;
 }
 
 /* Seat Booking Layout */
