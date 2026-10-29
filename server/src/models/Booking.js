@@ -27,6 +27,13 @@ const bookingSchema = new mongoose.Schema(
       type: [String],
       required: true,
     },
+    snacks: [
+      {
+        name: { type: String },
+        price: { type: Number },
+        quantity: { type: Number, default: 1 },
+      },
+    ],
     amount: {
       type: Number,
       required: true,

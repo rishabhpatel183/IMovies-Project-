@@ -252,13 +252,18 @@ router.post(
         throw err;
       }
 
+      const snacks = Array.isArray(req.body.snacks) ? req.body.snacks : [];
+      const snacksTotal = snacks.reduce((sum, s) => sum + (s.price || 0) * (s.quantity || 1), 0);
+      const totalAmount = show.price * codes.length + snacksTotal;
+
       const booking = new Booking({
         user: req.user._id,
         show: show._id,
         movie: show.movie,
         theatre: show.theatre,
         seats: codes,
-        amount: show.price * codes.length,
+        snacks: snacks,
+        amount: totalAmount,
         status: 'confirmed',
         payment: 'mock-paid',
         bookingCode,

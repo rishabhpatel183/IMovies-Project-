@@ -4,11 +4,13 @@ import api from '../api';
 import { toast } from 'react-toastify';
 
 const GENRES = ['All', 'Action', 'Sci-Fi', 'Drama', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Horror', 'Thriller'];
+const LANGUAGES = ['All', 'Hindi', 'English', 'Telugu', 'Tamil', 'Japanese'];
 
 export default function Home() {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('All');
+  const [selectedLang, setSelectedLang] = useState('All');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,6 +19,7 @@ export default function Home() {
       const params = { limit: 40 };
       if (search.trim()) params.search = search.trim();
       if (selectedGenre !== 'All') params.genre = selectedGenre;
+      if (selectedLang !== 'All') params.language = selectedLang;
 
       api
         .get('/movies', { params })
@@ -26,7 +29,7 @@ export default function Home() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [search, selectedGenre]);
+  }, [search, selectedGenre, selectedLang]);
 
   return (
     <>
@@ -58,6 +61,21 @@ export default function Home() {
                 onClick={() => setSelectedGenre(g)}
               >
                 {g}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-100 d-flex gap-2 flex-wrap align-items-center pt-2 border-top border-secondary border-opacity-25">
+            <span className="small text-secondary fw-semibold">Languages:</span>
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang}
+                className={`btn btn-sm py-0 px-2 rounded-pill ${
+                  selectedLang === lang ? 'btn-light text-dark fw-bold' : 'btn-outline-secondary text-secondary'
+                }`}
+                onClick={() => setSelectedLang(lang)}
+              >
+                {lang}
               </button>
             ))}
           </div>

@@ -5,6 +5,62 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 
+const SNACK_OPTIONS = [
+  {
+    id: 'caramel-popcorn',
+    name: 'Jumbo Caramel Popcorn (300g)',
+    desc: 'Freshly popped warm golden caramel crunch',
+    price: 240,
+    icon: '🍿',
+    tag: 'Bestseller',
+  },
+  {
+    id: 'cheese-popcorn',
+    name: 'Cheese & Salted Popcorn Mix',
+    desc: 'Double cheese burst gourmet seasoned popcorn',
+    price: 220,
+    icon: '🍿',
+    tag: 'Popular',
+  },
+  {
+    id: 'combo-duo',
+    name: 'Couple Combo: 2 Popcorn + 2 Coke',
+    desc: '2 Large Butter Popcorn & two 650ml chilled Cokes',
+    price: 490,
+    icon: '🥤',
+    tag: 'Save ₹90',
+  },
+  {
+    id: 'nachos-salsa',
+    name: 'Crispy Nachos & Warm Cheese Dip',
+    desc: 'Tortilla crisps with spicy jalapeno cheese & salsa',
+    price: 210,
+    icon: '🧀',
+  },
+  {
+    id: 'cold-brew',
+    name: 'Chilled Hazelnut Cold Coffee (450ml)',
+    desc: 'Rich creamy roast blend served ice-cold',
+    price: 160,
+    icon: '☕',
+  },
+  {
+    id: 'coke-large',
+    name: 'Chilled Coca-Cola (650ml)',
+    desc: 'Fountain dispenser chilled soft beverage',
+    price: 130,
+    icon: '🥤',
+  },
+];
+
+function getYouTubeEmbedUrl(url) {
+  if (!url) return null;
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/
+  );
+  return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0` : null;
+}
+
 export default function MoviePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -16,6 +72,8 @@ export default function MoviePage() {
   const [selectedCity, setSelectedCity] = useState('All');
   const [seats, setSeats] = useState([]);
   const [chosenSeats, setChosenSeats] = useState([]);
+  const [selectedSnacks, setSelectedSnacks] = useState({});
+  const [trailerModalOpen, setTrailerModalOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingMovie, setLoadingMovie] = useState(true);
 
@@ -120,6 +178,30 @@ export default function MoviePage() {
     }
   }
 
+  // Update snack quantity
+  function updateSnackQty(id, delta) {
+    setSelectedSnacks((prev) => {
+      const current = prev[id] || 0;
+      const next = Math.max(0, current + delta);
+      if (next === 0) {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      }
+      return { ...prev, [id]: next };
+    });
+  }
+
+  const snacksTotal = useMemo(() => {
+    return Object.entries(selectedSnacks).reduce((sum, [id, qty]) => {
+      const item = SNACK_OPTIONS.find((s) => s.id === id);
+      return sum + (item ? item.price * qty : 0);
+    }, 0);
+  }, [selectedSnacks]);
+
+  const ticketsTotal = chosenSeats.length * (selectedShow?.price || 0);
+  const grandTotal = ticketsTotal + snacksTotal;
+
   // Confirm booking
   async function handleBook() {
     if (!user) {
@@ -138,8 +220,23 @@ export default function MoviePage() {
       // Step 1: Hold selected seats
       await api.post(`/shows/${selectedShow._id}/hold`, { seats: chosenSeats });
 
-      // Step 2: Finalize booking
-      const res = await api.post(`/shows/${selectedShow._id}/book`, { seats: chosenSeats });
+      // Step 2: Prepare snacks payload
+      const snacksPayload = Object.entries(selectedSnacks)
+        .filter(([_, qty]) => qty > 0)
+        .map(([id, qty]) => {
+          const s = SNACK_OPTIONS.find((opt) => opt.id === id);
+          return {
+            name: s.name,
+            price: s.price,
+            quantity: qty,
+          };
+        });
+
+      // Step 3: Finalize booking
+      const res = await api.post(`/shows/${selectedShow._id}/book`, {
+        seats: chosenSeats,
+        snacks: snacksPayload,
+      });
 
       toast.success(`Booking Confirmed! Code: ${res.data.booking.bookingCode}`);
       navigate('/bookings');
@@ -195,14 +292,13 @@ export default function MoviePage() {
         )}
 
         {movie.trailerUrl && (
-          <a
-            href={movie.trailerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-outline-light w-100 mt-3 d-flex align-items-center justify-content-center gap-2"
+          <button
+            type="button"
+            onClick={() => setTrailerModalOpen(true)}
+            className="btn btn-danger w-100 mt-3 d-flex align-items-center justify-content-center gap-2 fw-semibold shadow-sm"
           >
             <span>▶</span> Watch Official Trailer
-          </a>
+          </button>
         )}
 
         {/* Director & Producer Side Panel */}
@@ -421,6 +517,91 @@ export default function MoviePage() {
               })}
             </div>
 
+            {/* CINEMA SNACKS & BEVERAGES SELECTOR */}
+            <div className="mt-4 pt-3 border-top border-secondary border-opacity-50">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <h4 className="h6 fw-bold mb-0 text-light d-flex align-items-center gap-2">
+                    <span>🍿</span> Grab Cinema Bites & Beverages
+                  </h4>
+                  <small className="text-secondary">Delivered directly to your cinema hall seat</small>
+                </div>
+                {snacksTotal > 0 && (
+                  <span className="badge bg-warning text-dark fw-bold">
+                    Snacks: +₹{snacksTotal}
+                  </span>
+                )}
+              </div>
+
+              <div className="row g-2">
+                {SNACK_OPTIONS.map((snack) => {
+                  const qty = selectedSnacks[snack.id] || 0;
+                  return (
+                    <div className="col-12 col-md-6" key={snack.id}>
+                      <div
+                        className={`snack-card p-2 p-sm-3 rounded-3 d-flex align-items-center justify-content-between ${
+                          qty > 0 ? 'snack-card-selected' : ''
+                        }`}
+                      >
+                        <div className="d-flex align-items-center gap-3 overflow-hidden">
+                          <div className="snack-icon fs-3 flex-shrink-0">{snack.icon}</div>
+                          <div className="overflow-hidden">
+                            <div className="d-flex align-items-center gap-2 flex-wrap">
+                              <span className="fw-semibold text-light small text-truncate">
+                                {snack.name}
+                              </span>
+                              {snack.tag && (
+                                <span
+                                  className="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25"
+                                  style={{ fontSize: '0.65rem' }}
+                                >
+                                  {snack.tag}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-secondary small text-truncate" style={{ fontSize: '0.75rem' }}>
+                              {snack.desc}
+                            </div>
+                            <div className="text-danger fw-bold small mt-1">₹{snack.price}</div>
+                          </div>
+                        </div>
+
+                        <div className="d-flex align-items-center gap-2 flex-shrink-0 ms-2">
+                          {qty > 0 ? (
+                            <div className="qty-control d-flex align-items-center bg-dark border border-secondary rounded-pill px-1">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-link text-light text-decoration-none px-2 py-0"
+                                onClick={() => updateSnackQty(snack.id, -1)}
+                              >
+                                -
+                              </button>
+                              <span className="fw-bold px-1 text-light small">{qty}</span>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-link text-light text-decoration-none px-2 py-0"
+                                onClick={() => updateSnackQty(snack.id, 1)}
+                              >
+                                +
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary px-3 rounded-pill"
+                              onClick={() => updateSnackQty(snack.id, 1)}
+                            >
+                              + Add
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Booking Summary Bar */}
             <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top border-secondary flex-wrap gap-2">
               <div>
@@ -428,8 +609,13 @@ export default function MoviePage() {
                   Selected Seats: {chosenSeats.length ? chosenSeats.join(', ') : 'None'}
                 </div>
                 <div className="text-secondary small">
-                  {chosenSeats.length} seats × ₹{selectedShow.price} ={' '}
-                  <strong className="text-light">₹{chosenSeats.length * selectedShow.price}</strong>
+                  {chosenSeats.length} seats × ₹{selectedShow.price} = ₹{ticketsTotal}
+                  {snacksTotal > 0 && (
+                    <span className="text-warning ms-2">
+                      + Snacks: ₹{snacksTotal}
+                    </span>
+                  )}
+                  {' '}· Total: <strong className="text-light fs-6">₹{grandTotal}</strong>
                 </div>
               </div>
 
@@ -444,7 +630,7 @@ export default function MoviePage() {
                     Processing...
                   </>
                 ) : (
-                  `Confirm Booking · ₹${chosenSeats.length * selectedShow.price}`
+                  `Confirm Booking · ₹${grandTotal}`
                 )}
               </button>
             </div>
@@ -455,6 +641,47 @@ export default function MoviePage() {
           </section>
         )}
       </div>
+
+      {/* Trailer Modal Overlay */}
+      {trailerModalOpen && (
+        <div className="trailer-modal-backdrop" onClick={() => setTrailerModalOpen(false)}>
+          <div className="trailer-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center p-3 border-bottom border-secondary">
+              <h3 className="h6 fw-bold mb-0 text-light d-flex align-items-center gap-2">
+                <span className="text-danger">▶</span> {movie.title} · Official Trailer
+              </h3>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                aria-label="Close"
+                onClick={() => setTrailerModalOpen(false)}
+              ></button>
+            </div>
+            <div className="ratio ratio-16x9">
+              {getYouTubeEmbedUrl(movie.trailerUrl) ? (
+                <iframe
+                  src={getYouTubeEmbedUrl(movie.trailerUrl)}
+                  title={`${movie.title} Trailer`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              ) : (
+                <div className="d-flex flex-column align-items-center justify-content-center p-5 text-center">
+                  <p className="text-secondary mb-3">Trailer video cannot be embedded directly.</p>
+                  <a
+                    href={movie.trailerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-danger"
+                  >
+                    Open Trailer on YouTube
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

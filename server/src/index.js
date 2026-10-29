@@ -13,6 +13,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import http from 'http';
 import { Server } from 'socket.io';
+import mongoose from 'mongoose';
 
 import connectDB from './config/db.js';
 import authRoutes from './routes/auth.js';
@@ -103,11 +104,47 @@ app.use(
 
 // Health check
 app.get('/api/health', (req, res) => {
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const rawUri = process.env.MONGO_URI || process.env.MONGODB_URI || '';
   res.json({
     status: 'ok',
     service: 'iMovies API',
+    database: {
+      status: states[mongoose.connection.readyState] || 'unknown',
+      host: mongoose.connection.host || null,
+      name: mongoose.connection.name || null,
+      hasMongoUri: Boolean(rawUri),
+      uriPreview: rawUri ? rawUri.replace(/:([^@]+)@/, ':****@') : 'NONE_PROVIDED',
+    },
     time: new Date().toISOString(),
   });
+});
+
+// Diagnostic endpoint to test direct MongoDB connection and reconnect if needed
+app.get('/api/db-test', async (req, res) => {
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI;
+  if (!uri) {
+    return res.status(500).json({ error: 'MONGO_URI is not set in environment variables' });
+  }
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
+    }
+    const count = await mongoose.connection.collection('movies').countDocuments();
+    res.json({
+      success: true,
+      moviesCount: count,
+      host: mongoose.connection.host,
+      database: mongoose.connection.name,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      errorName: err.name,
+      errorMessage: err.message,
+      reason: err.reason || null,
+    });
+  }
 });
 
 // Routes

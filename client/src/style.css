@@ -415,3 +415,218 @@ footer {
     font-size: 2.1rem;
   }
 }
+
+/* ==========================================================================
+   Interactive Trailer Modal, Snacks Selector & Cinema Boarding Pass Passports
+   ========================================================================== */
+
+/* Trailer Modal */
+.trailer-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.trailer-modal-content {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 900px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Snacks Selection */
+.snack-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.snack-card:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.snack-card-selected {
+  background-color: rgba(245, 158, 11, 0.08) !important;
+  border-color: #f59e0b !important;
+}
+
+.qty-control button {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Cinema Boarding Pass Modal */
+.ticket-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 1060;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.ticket-modal-content {
+  width: 100%;
+  max-width: 760px;
+  margin: auto;
+}
+
+.ticket-boarding-pass {
+  background: linear-gradient(135deg, #131b2e 0%, #0e1424 100%);
+  border: 1px solid #334155;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  position: relative;
+}
+
+.ticket-pass-header {
+  background: linear-gradient(90deg, #dc2626 0%, #991b1b 100%);
+}
+
+.ticket-subheading {
+  font-size: 0.7rem;
+  letter-spacing: 1.5px;
+  opacity: 0.9;
+  color: #fecaca;
+  font-weight: 600;
+}
+
+.border-end-dashed {
+  border-right: 2px dashed #334155;
+  position: relative;
+}
+
+@media (max-width: 767.98px) {
+  .border-end-dashed {
+    border-right: none;
+    border-bottom: 2px dashed #334155;
+  }
+}
+
+.ticket-poster {
+  width: 70px;
+  height: 98px;
+  object-fit: cover;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.ticket-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.ticket-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.ticket-value {
+  font-size: 0.95rem;
+}
+
+.ticket-seat-badge {
+  background-color: #facc15;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Print Stylesheet for Physical / PDF Tickets */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide everything except the ticket */
+  nav,
+  footer,
+  .hero,
+  .ticket-actions-bar,
+  .booking-card,
+  .btn,
+  .toastify {
+    display: none !important;
+  }
+
+  .ticket-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .ticket-modal-content {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .ticket-boarding-pass {
+    border: 2px solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .ticket-pass-header {
+    background: #000000 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ticket-pass-header * {
+    color: #ffffff !important;
+  }
+
+  .ticket-label {
+    color: #475569 !important;
+  }
+
+  .ticket-value,
+  .ticket-boarding-pass h4,
+  .ticket-boarding-pass p,
+  .ticket-boarding-pass span,
+  .ticket-boarding-pass strong {
+    color: #000000 !important;
+  }
+
+  .border-end-dashed {
+    border-color: #000000 !important;
+  }
+
+  .ticket-seat-badge {
+    background-color: #e2e8f0 !important;
+    color: #000000 !important;
+    border: 1px solid #000000 !important;
+  }
+
+  .ticket-barcode-wrap {
+    border: 1px solid #000000 !important;
+  }
+}
