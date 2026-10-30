@@ -68,6 +68,20 @@ function getYouTubeEmbedUrl(url) {
   return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0` : null;
 }
 
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function MoviePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -384,6 +398,104 @@ export default function MoviePage() {
       if (selectedShow) {
         loadSeats(selectedShow._id);
       }
+    }
+  }
+
+  // Real Razorpay Payment Gateway integration
+  async function handleRazorpayCheckout() {
+    if (!user) {
+      toast.info('Please log in to complete your booking.');
+      navigate('/login');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      // Step 1: Hold seats
+      await api.post(`/shows/${selectedShow._id}/hold`, { seats: chosenSeats });
+
+      // Step 2: Prepare snacks payload
+      const snacksPayload = Object.entries(selectedSnacks)
+        .filter(([_, qty]) => qty > 0)
+        .map(([snackId, qty]) => {
+          const s = SNACK_OPTIONS.find((opt) => opt.id === snackId);
+          return { name: s.name, price: s.price, quantity: qty };
+        });
+
+      // Step 3: Create Razorpay order on backend
+      const orderRes = await api.post('/payments/create-order', {
+        showId: selectedShow._id,
+        seats: chosenSeats,
+        snacks: snacksPayload,
+        couponCode: appliedCoupon,
+      });
+
+      const { order, keyId } = orderRes.data;
+
+      // Step 4: Dynamically load Razorpay SDK
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        toast.error('Razorpay SDK failed to load. Please check your internet connection.');
+        setBusy(false);
+        return;
+      }
+
+      // Step 5: Configure and launch Razorpay Checkout modal
+      const options = {
+        key: keyId,
+        amount: order.amount,
+        currency: order.currency || 'INR',
+        name: 'iMovies Multiplex Cinemas',
+        description: `${movie.title} · ${chosenSeats.length} Seats (${chosenSeats.join(', ')})`,
+        image: movie.posterUrl || 'https://i.imgur.com/gK6w7m2.png',
+        order_id: order.id.startsWith('order_mock_') ? undefined : order.id,
+        handler: async function (response) {
+          try {
+            setPaymentModalOpen(false);
+            toast.info('Payment received! Verifying and finalizing tickets...');
+
+            const verifyRes = await api.post('/payments/verify', {
+              showId: selectedShow._id,
+              seats: chosenSeats,
+              snacks: snacksPayload,
+              couponCode: appliedCoupon,
+              razorpay_order_id: response.razorpay_order_id || order.id,
+              razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
+              razorpay_signature: response.razorpay_signature || 'mock_signature',
+            });
+
+            toast.success(`🎉 Tickets Confirmed! Code: ${verifyRes.data.booking.bookingCode}`);
+            navigate('/bookings');
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Payment signature verification failed.');
+          }
+        },
+        prefill: {
+          name: user.name,
+          email: user.email,
+          contact: '9999999999',
+        },
+        theme: {
+          color: '#dc2626',
+        },
+        modal: {
+          ondismiss: function () {
+            setBusy(false);
+            toast.info('Checkout was cancelled.');
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (response) {
+        toast.error(`Payment failed: ${response.error?.description || 'Transaction declined'}`);
+        setBusy(false);
+      });
+      rzp.open();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not initiate Razorpay checkout.');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -1224,14 +1336,27 @@ export default function MoviePage() {
                       </div>
                     )}
 
-                    {/* Submit Pay Button */}
-                    <button
-                      type="button"
-                      className="btn btn-danger w-100 mt-3 py-2 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2"
-                      onClick={handleConfirmPayment}
-                    >
-                      <span>🔒</span> Pay ₹{grandTotal} Securely
-                    </button>
+                    {/* Action Buttons: Real Razorpay vs Instant Simulation */}
+                    <div className="mt-3 pt-2 border-top border-secondary border-opacity-50">
+                      <button
+                        type="button"
+                        className="btn btn-primary w-100 py-2 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 mb-2"
+                        onClick={handleRazorpayCheckout}
+                        disabled={busy}
+                        style={{ backgroundColor: '#2563eb', borderColor: '#1d4ed8' }}
+                      >
+                        <span>💳</span> Pay with Razorpay Gateway · ₹{grandTotal}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-danger w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
+                        onClick={handleConfirmPayment}
+                        disabled={busy}
+                      >
+                        <span>⚡</span> Instant Simulated Payment · ₹{grandTotal}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

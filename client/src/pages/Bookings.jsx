@@ -40,6 +40,16 @@ export default function Bookings() {
     }
   }
 
+  async function handleEmailTicket(id) {
+    try {
+      toast.info('Dispatching official admission ticket to your email...');
+      const res = await api.post(`/bookings/${id}/send-email`);
+      toast.success(res.data.message || 'Ticket dispatched to your email!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not send ticket email.');
+    }
+  }
+
   if (loading) {
     return (
       <div className="text-center py-5">
@@ -192,6 +202,15 @@ export default function Bookings() {
                         <span>🎫</span> View E-Ticket
                       </button>
 
+                      <button
+                        type="button"
+                        className="btn btn-outline-light btn-sm d-flex align-items-center justify-content-center gap-1"
+                        onClick={() => handleEmailTicket(b._id)}
+                        title="Send confirmation email"
+                      >
+                        <span>📧</span> Email Ticket
+                      </button>
+
                       {canCancel && (
                         <button
                           className="btn btn-outline-secondary btn-sm"
@@ -231,6 +250,13 @@ export default function Bookings() {
                 Press <strong>Print</strong> to save PDF or print boarding pass
               </span>
               <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-light btn-sm d-flex align-items-center gap-1"
+                  onClick={() => handleEmailTicket(selectedTicket._id)}
+                >
+                  <span>📧</span> Email My Ticket
+                </button>
                 <button
                   type="button"
                   className="btn btn-success btn-sm d-flex align-items-center gap-1 fw-semibold shadow-sm"

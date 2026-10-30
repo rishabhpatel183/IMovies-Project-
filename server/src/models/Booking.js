@@ -48,8 +48,28 @@ const bookingSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['UPI', 'CARD', 'NETBANKING', 'WALLET', 'DEMO'],
+      enum: ['UPI', 'CARD', 'NETBANKING', 'WALLET', 'DEMO', 'RAZORPAY'],
       default: 'UPI',
+    },
+    razorpayOrderId: {
+      type: String,
+      default: null,
+    },
+    razorpayPaymentId: {
+      type: String,
+      default: null,
+    },
+    isUsed: {
+      type: Boolean,
+      default: false,
+    },
+    scannedAt: {
+      type: Date,
+      default: null,
+    },
+    scannedBy: {
+      type: String,
+      default: null,
     },
     status: {
       type: String,

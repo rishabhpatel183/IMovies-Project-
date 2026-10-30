@@ -44,6 +44,11 @@ export default function Admin() {
   const [rows, setRows] = useState(6);
   const [cols, setCols] = useState(8);
 
+  // Turnstile Gate Scanner State
+  const [scanCode, setScanCode] = useState('');
+  const [scanResult, setScanResult] = useState(null);
+  const [scanning, setScanning] = useState(false);
+
   const [busy, setBusy] = useState(false);
 
   async function loadData() {
@@ -202,6 +207,33 @@ export default function Admin() {
     }
   }
 
+  // Verify ticket admission via Turnstile Scanner
+  async function handleVerifyTicket(codeToTest) {
+    const code = (codeToTest || scanCode).trim();
+    if (!code) {
+      toast.info('Please enter a booking reference code or scan a barcode.');
+      return;
+    }
+    setScanning(true);
+    try {
+      const res = await api.post('/bookings/verify-ticket', { code });
+      setScanResult({
+        success: true,
+        data: res.data,
+      });
+      toast.success(res.data.message || 'Admission approved!');
+      loadData();
+    } catch (err) {
+      setScanResult({
+        success: false,
+        data: err.response?.data || { message: 'Ticket verification error' },
+      });
+      toast.error(err.response?.data?.message || 'Ticket verification failed.');
+    } finally {
+      setScanning(false);
+    }
+  }
+
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -222,6 +254,12 @@ export default function Admin() {
           onClick={() => setTab('analytics')}
         >
           📊 Revenue & Analytics
+        </button>
+        <button
+          className={`btn ${tab === 'scanner' ? 'btn-danger' : 'btn-outline-secondary'}`}
+          onClick={() => setTab('scanner')}
+        >
+          🛂 Gate Admission Scanner
         </button>
         <button
           className={`btn ${tab === 'movie' ? 'btn-danger' : 'btn-outline-secondary'}`}
@@ -534,6 +572,129 @@ export default function Admin() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* TAB 0.5: TURNSTILE GATE ADMISSION SCANNER */}
+        {tab === 'scanner' && (
+          <div>
+            <div className="mb-4">
+              <span className="eyebrow">MULTIPLEX SECURITY & ACCESS CONTROL</span>
+              <h2 className="h5 fw-bold mb-1 text-light mt-1">🛂 Turnstile Gate Admission Scanner</h2>
+              <p className="text-secondary small mb-0">
+                Scan or enter customer booking barcodes to grant auditorium entry and invalidate used boarding passes.
+              </p>
+            </div>
+
+            {/* Input Bar */}
+            <div className="p-3 p-sm-4 rounded-3 bg-dark border border-secondary border-opacity-50 mb-4" style={{ maxWidth: '680px' }}>
+              <label className="form-label text-light small fw-bold mb-2">
+                Scan Barcode or Enter Confirmation Code:
+              </label>
+              <div className="input-group input-group-lg mb-3">
+                <span className="input-group-text bg-secondary bg-opacity-25 border-secondary text-light">
+                  🎟️
+                </span>
+                <input
+                  type="text"
+                  className="form-control bg-dark border-secondary text-light font-monospace"
+                  placeholder="e.g. IMV-M9G2-4821"
+                  value={scanCode}
+                  onChange={(e) => setScanCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleVerifyTicket()}
+                />
+                <button
+                  type="button"
+                  className="btn btn-danger px-4 fw-bold"
+                  onClick={() => handleVerifyTicket()}
+                  disabled={scanning}
+                >
+                  {scanning ? 'Verifying...' : 'Admit Entry'}
+                </button>
+              </div>
+
+              {/* Quick sample chips from recent bookings */}
+              {analytics?.recentBookings?.length > 0 && (
+                <div>
+                  <small className="text-secondary d-block mb-1">Click recent code to test scan:</small>
+                  <div className="d-flex flex-wrap gap-1">
+                    {analytics.recentBookings.slice(0, 5).map((b) => (
+                      <button
+                        key={b.bookingCode}
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary py-0 px-2 font-monospace"
+                        style={{ fontSize: '0.72rem' }}
+                        onClick={() => {
+                          setScanCode(b.bookingCode);
+                          handleVerifyTicket(b.bookingCode);
+                        }}
+                      >
+                        {b.bookingCode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Verification Result Card */}
+            {scanResult && (
+              <div
+                className={`p-4 rounded-3 border mb-4 ${
+                  scanResult.success
+                    ? 'bg-success bg-opacity-10 border-success'
+                    : 'bg-danger bg-opacity-10 border-danger'
+                }`}
+                style={{ maxWidth: '680px' }}
+              >
+                <div className="d-flex align-items-center gap-3 mb-3">
+                  <span className="display-5">
+                    {scanResult.success ? '✅' : '⛔'}
+                  </span>
+                  <div>
+                    <h3 className={`h5 fw-bold mb-1 ${scanResult.success ? 'text-success' : 'text-danger'}`}>
+                      {scanResult.data?.message}
+                    </h3>
+                    <small className="text-secondary">
+                      Checked at {new Date().toLocaleTimeString()} by {user.name}
+                    </small>
+                  </div>
+                </div>
+
+                {scanResult.data?.booking && (
+                  <div className="p-3 rounded-2 bg-dark border border-secondary border-opacity-50 small">
+                    <div className="row g-2">
+                      <div className="col-sm-6">
+                        <span className="text-secondary d-block">FILM</span>
+                        <strong className="text-light fs-6">
+                          {scanResult.data.booking.movie?.title}
+                        </strong>
+                      </div>
+                      <div className="col-sm-6">
+                        <span className="text-secondary d-block">AUDI / SCREEN</span>
+                        <strong className="text-warning fs-6">
+                          {scanResult.data.booking.show?.screen || 'Screen 1'}
+                        </strong>
+                      </div>
+                      <div className="col-sm-6">
+                        <span className="text-secondary d-block">SEATS</span>
+                        <span className="badge bg-warning text-dark fw-bold">
+                          {Array.isArray(scanResult.data.booking.seats)
+                            ? scanResult.data.booking.seats.join(', ')
+                            : scanResult.data.booking.seats}
+                        </span>
+                      </div>
+                      <div className="col-sm-6">
+                        <span className="text-secondary d-block">CUSTOMER</span>
+                        <span className="text-light">
+                          {scanResult.data.booking.user?.name} ({scanResult.data.booking.user?.email})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

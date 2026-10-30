@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import Booking from '../models/Booking.js';
 import Show from '../models/Show.js';
+import Movie from '../models/Movie.js';
+import Theatre from '../models/Theatre.js';
 import { protect } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { sendTicketEmail } from '../utils/mailer.js';
 
 const router = Router();
 
@@ -18,6 +21,102 @@ router.get(
       .sort({ createdAt: -1 });
 
     res.json(bookings);
+  })
+);
+
+// POST /api/bookings/:id/send-email - Dispatch ticket confirmation email to user
+router.post(
+  '/:id/send-email',
+  protect,
+  asyncHandler(async (req, res) => {
+    const booking = await Booking.findById(req.params.id)
+      .populate('movie')
+      .populate('theatre')
+      .populate('show')
+      .populate('user');
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found.' });
+    }
+
+    // Only allow owner or admin to trigger email
+    if (String(booking.user._id) !== String(req.user._id) && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Unauthorized to email this ticket.' });
+    }
+
+    const emailResult = await sendTicketEmail({
+      booking,
+      user: booking.user,
+      movie: booking.movie,
+      theatre: booking.theatre,
+      show: booking.show,
+    });
+
+    res.json({
+      success: true,
+      message: `Admission ticket email sent to ${booking.user.email}!`,
+      simulated: emailResult.simulated || false,
+    });
+  })
+);
+
+// POST /api/bookings/verify-ticket - Turnstile Usher QR Code entry scanner
+router.post(
+  '/verify-ticket',
+  protect,
+  asyncHandler(async (req, res) => {
+    const rawCode = String(req.body.code || '').trim().toUpperCase();
+    if (!rawCode) {
+      return res.status(400).json({ message: 'Booking code or QR code is required.' });
+    }
+
+    const booking = await Booking.findOne({
+      bookingCode: { $regex: new RegExp(`^${rawCode}$`, 'i') },
+    })
+      .populate('movie', 'title posterUrl durationMinutes certificate')
+      .populate('theatre', 'name city location')
+      .populate('show', 'startsAt screen price')
+      .populate('user', 'name email');
+
+    if (!booking) {
+      return res.status(404).json({
+        valid: false,
+        message: `Ticket "${rawCode}" does not exist in the cinema registry.`,
+      });
+    }
+
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({
+        valid: false,
+        status: 'cancelled',
+        message: 'TICKET VOID: This booking was cancelled and refunded.',
+        booking,
+      });
+    }
+
+    if (booking.isUsed) {
+      return res.status(400).json({
+        valid: false,
+        status: 'already_used',
+        message: `ALREADY USED: Entry was previously scanned on ${new Date(
+          booking.scannedAt
+        ).toLocaleTimeString()} by ${booking.scannedBy || 'Turnstile Gate'}.`,
+        booking,
+      });
+    }
+
+    // Mark as used
+    booking.isUsed = true;
+    booking.scannedAt = new Date();
+    booking.scannedBy = req.user.name || 'Cinema Usher';
+    await booking.save();
+
+    res.json({
+      valid: true,
+      status: 'approved',
+      message: '✅ ADMISSION GRANTED: Valid boarding pass. Welcome to iMovies!',
+      booking,
+    });
   })
 );
 
