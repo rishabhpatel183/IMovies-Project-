@@ -21,6 +21,7 @@ import movieRoutes from './routes/movies.js';
 import theatreRoutes from './routes/theatres.js';
 import showRoutes from './routes/shows.js';
 import bookingRoutes from './routes/bookings.js';
+import adminRoutes from './routes/admin.js';
 import { notFound, errorHandler } from './middleware/errors.js';
 
 const app = express();
@@ -153,6 +154,7 @@ app.use('/api/movies', movieRoutes);
 app.use('/api/theatres', theatreRoutes);
 app.use('/api/shows', showRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error Handlers
 app.use(notFound);

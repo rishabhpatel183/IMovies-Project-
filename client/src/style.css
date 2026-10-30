@@ -479,6 +479,66 @@ footer {
   overflow-y: auto;
 }
 
+/* Payment Gateway Modal */
+.payment-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 1065;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.payment-modal-content {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  width: 100%;
+  max-width: 720px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+}
+
+.border-end-dashed-md {
+  border-right: 1px dashed var(--border-color);
+}
+
+@media (max-width: 767.98px) {
+  .border-end-dashed-md {
+    border-right: none;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 16px;
+  }
+}
+
+.upi-qr-wrapper {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.upi-qr-wrapper:hover {
+  transform: scale(1.03);
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(-5%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
 .ticket-modal-content {
   width: 100%;
   max-width: 760px;

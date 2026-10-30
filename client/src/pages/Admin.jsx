@@ -7,9 +7,10 @@ import { toast } from 'react-toastify';
 export default function Admin() {
   const { user } = useAuth();
 
-  const [tab, setTab] = useState('movie');
+  const [tab, setTab] = useState('analytics');
   const [movies, setMovies] = useState([]);
   const [theatres, setTheatres] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Form states - Movie
@@ -48,12 +49,16 @@ export default function Admin() {
   async function loadData() {
     try {
       setLoading(true);
-      const [mRes, tRes] = await Promise.all([
+      const [mRes, tRes, aRes] = await Promise.all([
         api.get('/movies?limit=100'),
         api.get('/theatres'),
+        api.get('/admin/analytics').catch(() => ({ data: null })),
       ]);
       setMovies(mRes.data.items);
       setTheatres(tRes.data);
+      if (aRes?.data) {
+        setAnalytics(aRes.data);
+      }
 
       if (mRes.data.items.length > 0 && !selectedMovie) {
         setSelectedMovie(mRes.data.items[0]._id);
@@ -211,7 +216,13 @@ export default function Admin() {
       </div>
 
       {/* Tabs */}
-      <div className="btn-group mb-4">
+      <div className="btn-group mb-4 flex-wrap gap-1">
+        <button
+          className={`btn ${tab === 'analytics' ? 'btn-danger' : 'btn-outline-secondary'}`}
+          onClick={() => setTab('analytics')}
+        >
+          📊 Revenue & Analytics
+        </button>
         <button
           className={`btn ${tab === 'movie' ? 'btn-danger' : 'btn-outline-secondary'}`}
           onClick={() => setTab('movie')}
@@ -239,6 +250,293 @@ export default function Admin() {
       </div>
 
       <div className="admin-card">
+        {/* TAB 0: ANALYTICS & REVENUE */}
+        {tab === 'analytics' && (
+          <div>
+            <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+              <div>
+                <h2 className="h5 fw-bold mb-1 text-light">Multiplex Revenue & Operational Analytics</h2>
+                <p className="text-secondary small mb-0">
+                  Real-time ticket sales, gross revenue, food & beverage breakdown, and customer audit trail.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline-light btn-sm d-flex align-items-center gap-1"
+                onClick={loadData}
+              >
+                <span>🔄</span> Refresh Analytics
+              </button>
+            </div>
+
+            {/* 4 Top KPI Cards */}
+            <div className="row g-3 mb-4">
+              <div className="col-6 col-lg-3">
+                <div className="p-3 rounded-3 bg-dark bg-opacity-50 border border-secondary border-opacity-50 h-100">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small fw-semibold text-uppercase">Gross Revenue</span>
+                    <span className="fs-5">💰</span>
+                  </div>
+                  <div className="h3 fw-bold text-success mb-1">
+                    ₹{(analytics?.summary?.totalRevenue || 0).toLocaleString()}
+                  </div>
+                  <small className="text-secondary">Across all cinema branches</small>
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 rounded-3 bg-dark bg-opacity-50 border border-secondary border-opacity-50 h-100">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small fw-semibold text-uppercase">Tickets Sold</span>
+                    <span className="fs-5">🎟️</span>
+                  </div>
+                  <div className="h3 fw-bold text-light mb-1">
+                    {(analytics?.summary?.totalTicketsSold || 0).toLocaleString()}
+                  </div>
+                  <small className="text-secondary">
+                    From {analytics?.summary?.totalBookings || 0} completed bookings
+                  </small>
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 rounded-3 bg-dark bg-opacity-50 border border-secondary border-opacity-50 h-100">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small fw-semibold text-uppercase">F&B Snack Sales</span>
+                    <span className="fs-5">🍿</span>
+                  </div>
+                  <div className="h3 fw-bold text-warning mb-1">
+                    ₹{(analytics?.summary?.totalSnacksRevenue || 0).toLocaleString()}
+                  </div>
+                  <small className="text-secondary">Cinema concessions & combos</small>
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 rounded-3 bg-dark bg-opacity-50 border border-secondary border-opacity-50 h-100">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small fw-semibold text-uppercase">Promo Savings</span>
+                    <span className="fs-5">🏷️</span>
+                  </div>
+                  <div className="h3 fw-bold text-danger mb-1">
+                    ₹{(analytics?.summary?.totalDiscountGiven || 0).toLocaleString()}
+                  </div>
+                  <small className="text-secondary">Discounts through coupons</small>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Section: Top Grossing Movies & City Breakdown */}
+            <div className="row g-4 mb-4">
+              {/* Top Movies Leaderboard */}
+              <div className="col-12 col-lg-7">
+                <div className="p-3 p-sm-4 rounded-3 bg-dark bg-opacity-25 border border-secondary border-opacity-50 h-100">
+                  <h3 className="h6 fw-bold text-light mb-3 d-flex align-items-center gap-2">
+                    <span>🏆</span> Top Grossing Films Leaderboard
+                  </h3>
+
+                  {(!analytics?.topMovies || analytics.topMovies.length === 0) ? (
+                    <p className="text-secondary small py-3 mb-0 text-center">
+                      No movie sales recorded yet. Once bookings occur, top performers will rank here.
+                    </p>
+                  ) : (
+                    <div className="d-grid gap-3">
+                      {analytics.topMovies.map((m, idx) => {
+                        const maxRev = analytics.topMovies[0]?.revenue || 1;
+                        const pct = Math.round((m.revenue / maxRev) * 100);
+
+                        return (
+                          <div key={m.id} className="d-flex align-items-center gap-3">
+                            <span className="fw-bold fs-5 text-secondary" style={{ width: '22px' }}>
+                              #{idx + 1}
+                            </span>
+                            {m.posterUrl ? (
+                              <img
+                                src={m.posterUrl}
+                                alt={m.title}
+                                style={{
+                                  width: '42px',
+                                  height: '56px',
+                                  objectFit: 'cover',
+                                  borderRadius: '6px',
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '42px',
+                                  height: '56px',
+                                  background: '#334155',
+                                  borderRadius: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                🎬
+                              </div>
+                            )}
+                            <div className="flex-grow-1 overflow-hidden">
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className="fw-bold text-light small text-truncate" title={m.title}>
+                                  {m.title}
+                                </span>
+                                <span className="fw-bold text-success small">
+                                  ₹{m.revenue.toLocaleString()}
+                                </span>
+                              </div>
+                              <div
+                                className="progress bg-secondary bg-opacity-25"
+                                style={{ height: '6px' }}
+                              >
+                                <div
+                                  className="progress-bar bg-danger"
+                                  role="progressbar"
+                                  style={{ width: `${pct}%` }}
+                                ></div>
+                              </div>
+                              <div className="d-flex justify-content-between text-secondary mt-1" style={{ fontSize: '0.72rem' }}>
+                                <span>🎟️ {m.tickets} tickets</span>
+                                <span>⭐ {m.rating}/10</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* City Revenue Distribution */}
+              <div className="col-12 col-lg-5">
+                <div className="p-3 p-sm-4 rounded-3 bg-dark bg-opacity-25 border border-secondary border-opacity-50 h-100">
+                  <h3 className="h6 fw-bold text-light mb-3 d-flex align-items-center gap-2">
+                    <span>📍</span> Sales by City / Multiplex
+                  </h3>
+
+                  {(!analytics?.cityDistribution || analytics.cityDistribution.length === 0) ? (
+                    <p className="text-secondary small py-3 mb-0 text-center">
+                      City analytics will populate once orders are placed.
+                    </p>
+                  ) : (
+                    <div className="d-grid gap-3">
+                      {analytics.cityDistribution.map((c) => {
+                        const totalRev = analytics.summary.totalRevenue || 1;
+                        const share = Math.round((c.revenue / totalRev) * 100);
+
+                        return (
+                          <div key={c.city}>
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span className="fw-bold text-light small">
+                                {c.city}
+                              </span>
+                              <span className="text-light-emphasis small">
+                                ₹{c.revenue.toLocaleString()}{' '}
+                                <small className="text-secondary">({share}%)</small>
+                              </span>
+                            </div>
+                            <div
+                              className="progress bg-secondary bg-opacity-25"
+                              style={{ height: '6px' }}
+                            >
+                              <div
+                                className="progress-bar bg-warning"
+                                role="progressbar"
+                                style={{ width: `${share}%` }}
+                              ></div>
+                            </div>
+                            <small className="text-secondary" style={{ fontSize: '0.72rem' }}>
+                              {c.tickets} seats booked
+                            </small>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Bookings Audit Table */}
+            <div>
+              <h3 className="h6 fw-bold text-light mb-3 d-flex align-items-center gap-2">
+                <span>🧾</span> Recent 10 Transactions & Audit Log
+              </h3>
+              {(!analytics?.recentBookings || analytics.recentBookings.length === 0) ? (
+                <div className="p-4 text-center border border-secondary border-opacity-25 rounded-3">
+                  <p className="text-secondary mb-0">No transaction records available yet.</p>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-dark table-hover small align-middle mb-0">
+                    <thead className="table-secondary text-dark">
+                      <tr>
+                        <th>Booking Code</th>
+                        <th>Film & Screen</th>
+                        <th>Customer</th>
+                        <th>Seats</th>
+                        <th>Payment</th>
+                        <th>Amount</th>
+                        <th>Booked At</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.recentBookings.map((b) => (
+                        <tr key={b._id}>
+                          <td>
+                            <span className="font-monospace fw-bold text-warning">
+                              {b.bookingCode}
+                            </span>
+                          </td>
+                          <td>
+                            <strong className="text-light d-block text-truncate" style={{ maxWidth: '160px' }}>
+                              {b.movieTitle}
+                            </strong>
+                            <small className="text-secondary">
+                              {b.theatreName} ({b.city})
+                            </small>
+                          </td>
+                          <td>
+                            <span className="text-light d-block">{b.userName}</span>
+                            <small className="text-secondary">{b.userEmail}</small>
+                          </td>
+                          <td>
+                            <span className="badge bg-secondary">
+                              {Array.isArray(b.seats) ? b.seats.join(', ') : b.seats}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">
+                              {b.paymentMethod}
+                            </span>
+                            {b.discount > 0 && (
+                              <small className="d-block text-danger">
+                                -₹{b.discount} off
+                              </small>
+                            )}
+                          </td>
+                          <td>
+                            <strong className="text-light fs-6">₹{b.amount}</strong>
+                          </td>
+                          <td className="text-secondary" style={{ fontSize: '0.75rem' }}>
+                            {new Date(b.createdAt).toLocaleString([], {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* TAB 1: ADD MOVIE */}
         {tab === 'movie' && (
           <form onSubmit={handleAddMovie}>

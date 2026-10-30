@@ -161,9 +161,21 @@ export default function Bookings() {
                       </p>
                     )}
 
-                    <small className="text-secondary font-monospace">
-                      Confirmation Code: <span className="text-light">{b.bookingCode}</span>
-                    </small>
+                    {b.discount > 0 && (
+                      <p className="mb-1 small text-success">
+                        🏷️ Discount Applied:{' '}
+                        <strong>-₹{b.discount}</strong> ({b.couponCode})
+                      </p>
+                    )}
+
+                    <div className="d-flex align-items-center gap-2 mt-1">
+                      <span className="badge bg-dark border border-secondary text-light small py-0">
+                        Method: {b.paymentMethod || 'UPI'}
+                      </span>
+                      <small className="text-secondary font-monospace">
+                        Code: <span className="text-light">{b.bookingCode}</span>
+                      </small>
+                    </div>
                   </div>
 
                   {/* Price and Actions */}
@@ -356,9 +368,15 @@ export default function Bookings() {
                   )}
 
                   {/* Pricing footer */}
-                  <div className="d-flex justify-content-between align-items-center pt-2 border-top border-secondary border-opacity-50 small">
+                  <div className="d-flex justify-content-between align-items-center pt-2 border-top border-secondary border-opacity-50 small flex-wrap gap-1">
                     <span className="text-secondary">
-                      Payment Status: <strong className="text-success">PAID (₹{selectedTicket.amount})</strong>
+                      Paid: <strong className="text-success">₹{selectedTicket.amount}</strong> via{' '}
+                      <span className="badge bg-secondary py-0">{selectedTicket.paymentMethod || 'UPI'}</span>
+                      {selectedTicket.discount > 0 && (
+                        <span className="text-warning ms-1">
+                          (Saved ₹{selectedTicket.discount} with {selectedTicket.couponCode})
+                        </span>
+                      )}
                     </span>
                     <span className="text-secondary">Demo Mode: No refund deduction</span>
                   </div>

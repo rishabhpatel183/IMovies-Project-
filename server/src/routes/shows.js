@@ -254,7 +254,31 @@ router.post(
 
       const snacks = Array.isArray(req.body.snacks) ? req.body.snacks : [];
       const snacksTotal = snacks.reduce((sum, s) => sum + (s.price || 0) * (s.quantity || 1), 0);
-      const totalAmount = show.price * codes.length + snacksTotal;
+      const subtotal = show.price * codes.length + snacksTotal;
+
+      // Validate & calculate coupon discount
+      const rawCoupon = String(req.body.couponCode || '').trim().toUpperCase();
+      let discount = 0;
+      let appliedCoupon = null;
+
+      if (rawCoupon === 'IMOVIES50' && subtotal >= 200) {
+        discount = 50;
+        appliedCoupon = 'IMOVIES50';
+      } else if (rawCoupon === 'POPCORN100' && subtotal >= 450) {
+        discount = 100;
+        appliedCoupon = 'POPCORN100';
+      } else if (rawCoupon === 'BLOCKBUSTER20' && subtotal >= 300) {
+        discount = Math.min(150, Math.round(subtotal * 0.2));
+        appliedCoupon = 'BLOCKBUSTER20';
+      } else if (rawCoupon === 'WELCOME75' && subtotal >= 250) {
+        discount = 75;
+        appliedCoupon = 'WELCOME75';
+      }
+
+      const totalAmount = Math.max(0, subtotal - discount);
+      const paymentMethod = ['UPI', 'CARD', 'NETBANKING', 'WALLET'].includes(req.body.paymentMethod)
+        ? req.body.paymentMethod
+        : 'UPI';
 
       const booking = new Booking({
         user: req.user._id,
@@ -264,6 +288,9 @@ router.post(
         seats: codes,
         snacks: snacks,
         amount: totalAmount,
+        couponCode: appliedCoupon,
+        discount: discount,
+        paymentMethod: paymentMethod,
         status: 'confirmed',
         payment: 'mock-paid',
         bookingCode,
